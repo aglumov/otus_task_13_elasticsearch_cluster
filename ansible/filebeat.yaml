@@ -1,0 +1,21 @@
+- name: Filebeat | Copy Filebeat package
+  ansible.builtin.copy:
+    src: "files/filebeat-oss-7.12.1-amd64.deb"
+    dest: "/tmp/filebeat-oss-7.12.1-amd64.deb"
+
+- name: Filebeat | Install Filebeat
+  ansible.builtin.apt:
+    deb: "/tmp/filebeat-oss-7.12.1-amd64.deb"
+
+- name: Filebeat | Check if Filebeat is running and enabled
+  ansible.builtin.systemd:
+    name: filebeat
+    state: started
+    enabled: true
+
+- name: Filebeat | Configure Filebeat
+  ansible.builtin.template:
+    src: "templates/filebeat.yml.j2"
+    dest: "/etc/filebeat/filebeat.yml"
+  notify: restart filebeat
+

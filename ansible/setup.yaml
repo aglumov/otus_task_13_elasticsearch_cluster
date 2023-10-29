@@ -1,0 +1,140 @@
+---
+- name: Opensearch installation & configuration
+  hosts: os-cluster
+  become: true
+  gather_facts: true
+  vars:
+    admin_password: admin
+    logstash_password: logstash
+    kibanaserver_password: kibana
+  roles:
+    - opensearch
+
+- name: Opensearch dashboards installation & configuration
+  hosts: dashboards
+  become: true
+  gather_facts: true
+  vars:
+    kibanaserver_password: kibana
+  roles:
+    - dashboards
+
+- name: Install and configure Loadbalancer, Web application and Database
+  hosts: all
+  become: true
+
+  vars:
+    db_packages:
+    - mariadb-server
+    - python3-pip      
+    lb_packages:
+    - nginx
+    app_packages:
+    - adduser
+    - nginx
+    - php-fpm
+    - php-mysql
+    - unzip      
+    wp_db_name: "wordpress"
+    wp_db_user: "wordpress"
+    wp_db_pass: "wordpresspassword"
+    wp_db_host: "{{ hostvars['db0'].ansible_host }}"      
+    os_prefix: "os"
+
+
+  tasks:
+  - name: All | Disable auto updates on Ubuntu
+    ansible.builtin.copy:
+      dest: /etc/apt/apt.conf.d/20auto-upgrades
+      content: |
+        APT::Periodic::Update-Package-Lists "0";
+        APT::Periodic::Unattended-Upgrade "0";
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: All | Set hostname
+    ansible.builtin.hostname:
+      name: "{{ inventory_hostname }}"
+      use: "systemd"
+
+  - name: Install and configure Database
+    include_tasks: "db.yaml"
+    when: inventory_hostname in groups["db"]
+
+  - name: Install and configure Apps
+    include_tasks: "app.yaml"
+    when: inventory_hostname in groups["app"]
+
+       
+#  - name: Test import 1
+#    import_role:
+#      name: linux/opensearch
+#    when: inventory_hostname in groups["os-cluster"]
+#
+#  - name: Opensearch dashboards installation & configuration
+#    import_role:
+#      name: linux/dashboards
+#    when: inventory_hostname in groups["dashboards"]
+
+      #post_tasks:
+  - name: Loadbalancer | Install and configure Nginx
+    include_tasks: "lb.yaml"
+    when: inventory_hostname in groups["lb"]
+
+  - name: Dashboards | Configure Opensearch-Dashboard prefix
+    ansible.builtin.lineinfile:
+      path: "/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml"
+      insertbefore: "BOF"
+      search_string: "{{ item.search_string }}"
+      line: "{{ item.line }}"
+    loop:
+    - search_string: server.basePath
+      line: "server.basePath: \"/{{ os_prefix }}\""
+    - search_string: server.rewriteBasePath
+      line: "server.rewriteBasePath: true"
+    notify: restart opensearch-dashboards
+    when: inventory_hostname in groups["dashboards"]
+
+  - name: Install logstash
+    include_tasks: "logstash.yaml"
+      #when: inventory_hostname == 'os0'
+    when: inventory_hostname in groups.os
+
+  - name: Install Filebeat
+    include_tasks: "filebeat.yaml"
+    when: (inventory_hostname in groups.lb) or
+          (inventory_hostname in groups.app) or
+          (inventory_hostname in groups.db)
+
+  handlers:
+  - name: reload nginx
+    ansible.builtin.systemd:
+      name: "nginx"
+      state: reloaded
+
+  - name: restart php-fpm
+    ansible.builtin.systemd:
+      name: "php8.1-fpm.service"
+      state: restarted
+
+  - name: restart mariadb-server
+    ansible.builtin.systemd:
+      name: "mariadb.service"
+      state: restarted        
+
+  - name: restart opensearch-dashboards
+    ansible.builtin.systemd:
+      name: dashboards
+      state: restarted
+      daemon_reload: true      
+
+  - name: restart filebeat
+    ansible.builtin.systemd:
+      name: filebeat
+      state: restarted
+      daemon_reload: true      
+
+  - name: restart logstash
+    ansible.builtin.systemd:
+      name: logstash
+      state: restarted
+      daemon_reload: true

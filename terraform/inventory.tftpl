@@ -1,0 +1,37 @@
+[lb]
+%{ for index_1, host in lb_vm_names ~}
+${lb_vm_names[index_1]} ansible_host=${lb_ip_address_list[index_1]}
+%{ endfor ~}
+
+[db]
+%{ for index_2, host in db_vm_names ~}
+${db_vm_names[index_2]} ansible_host=${db_ip_address_list[index_2]}
+%{ endfor ~}
+
+[app]
+%{ for index_3, host in app_vm_names ~}
+${app_vm_names[index_3]} ansible_host=${app_ip_address_list[index_3]}
+%{ endfor ~}
+
+[os]
+%{ for index_4, host in os_vm_names ~}
+${os_vm_names[index_4]} ansible_host=${os_ip_address_list[index_4]} ip=${os_ip_address_list[index_4]} roles=data,master,ingest
+%{ endfor ~}
+
+[os-cluster]
+%{ for index_4, host in os_vm_names ~}
+${os_vm_names[index_4]}
+%{ endfor ~}
+
+[master]
+%{ for index_4, host in os_vm_names ~}
+${os_vm_names[index_4]}
+%{ endfor ~}
+
+[dashboards]
+${os_vm_names[0]}
+
+
+[all:vars]
+public_ip=${lb_nat_ip_address_list[0]}
+ansible_user=ubuntu

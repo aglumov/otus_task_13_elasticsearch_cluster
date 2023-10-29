@@ -1,0 +1,26 @@
+- name: LoadBalancer | Install Packages
+  ansible.builtin.apt: 
+    name: "{{ lb_packages }}"
+    state: latest
+    update_cache: true
+
+- name: LoadBalancer | Configure nginx for proxy to apps
+  ansible.builtin.template:
+    src: "templates/lb.conf.j2"
+    dest: "/etc/nginx/conf.d/lb.conf"
+    owner: www-data
+    group: www-data
+  notify: reload nginx
+
+- name: LoadBalancer | Remove default config
+  ansible.builtin.file:
+    path: "/etc/nginx/sites-enabled/default"
+    state: absent
+  notify: reload nginx
+
+- name: LoadBalancer | Copy Nginx main config
+  ansible.builtin.copy:
+    src: "files/nginx.conf"
+    dest: "/etc/nginx/nginx.conf"
+    mode: "0644"
+  notify: reload nginx

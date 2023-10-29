@@ -1,0 +1,32 @@
+upstream @elasticsearch {
+{% for item in groups.dashboards %}
+  server {{ hostvars[item].ansible_host }}:5601 max_fails=1;
+{% endfor %}
+}
+
+upstream @wordpress {
+{% for item in groups.app %}
+  server {{ hostvars[item].ansible_host }}:80 max_fails=1;
+{% endfor %}
+}
+
+server {
+  listen 80;
+  server_name _;
+
+  location /{{ os_prefix }} {
+    proxy_pass http://@elasticsearch;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header Host $host;
+    proxy_connect_timeout 5;
+  }
+
+  location / {
+    proxy_pass http://@wordpress;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header Host $host;
+    proxy_connect_timeout 5;
+  }
+}

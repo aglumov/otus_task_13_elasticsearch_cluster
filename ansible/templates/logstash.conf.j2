@@ -1,0 +1,20 @@
+input {
+  beats {
+    port => 5044
+  }
+}
+
+output {
+  opensearch {
+    hosts       => [
+{%- for i in groups.os %}
+"https://{{ hostvars[i].ansible_host }}:9200"{% if not loop.last %}, {% endif %}
+{%- endfor %}
+]
+    user        => "admin"
+    password    => "admin"
+    index       => "logstash-logs-%{+YYYY.MM.dd}"
+    ssl_certificate_verification => false
+  }
+  stdout { codec => rubydebug }
+}

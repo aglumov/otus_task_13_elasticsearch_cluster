@@ -1,0 +1,21 @@
+filebeat.inputs:
+- type: filestream
+  id: {{ inventory_hostname }}-logs
+  paths:
+{% if inventory_hostname in groups.app %}
+    - /var/log/nginx/*.log
+{% elif inventory_hostname in groups.lb %}
+    - /var/log/nginx/*.log
+{% elif inventory_hostname in groups.db%}
+    - /var/log/mysql/*.err
+{% endif %}
+
+#output.logstash:
+#  hosts:
+#  - {{ hostvars['os0'].ansible_host }}:5044
+
+output.logstash:
+  hosts:
+{% for i in groups.os %}
+  - {{ hostvars[i].ansible_host }}:5044
+{% endfor %}
